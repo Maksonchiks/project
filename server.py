@@ -46,33 +46,26 @@ def ping():
 
 @app.route("/login", methods=["POST"])
 def login():
+    print("Received login request:", request.json)
     init_db()
     if not request.is_json:
         return jsonify({"error": "Требуется JSON"}), 400
 
     data = request.get_json()
-    phone = data.get("phone")
-    passport = data.get("passport")
-    full_name = data.get("full_name", "Новый пользователь")
+    phone = data.get("phone", "").strip()
+    passport = data.get("passport", "").strip().replace(" ", "")  # Удаляем пробелы в паспорте
 
     users = load_users()
+    print("Loaded users from CSV:", users)
     for user in users:
-        if user["phone"] == phone and user["passport"] == passport:
+        # Нормализуем данные перед сравнением
+        db_phone = user["phone"].strip()
+        db_passport = user["passport"].strip().replace(" ", "")
+        
+        if db_phone == phone and db_passport == passport:
             return jsonify(user)
 
-    new_id = max(int(u['id']) for u in users) + 1 if users else 1
-    new_user = {
-        "id": new_id,
-        "phone": phone,
-        "passport": passport,
-        "full_name": full_name,
-        "address": "",
-        "tariff": "",
-        "balance": "0"
-    }
-    users.append(new_user)
-    save_users(users)
-    return jsonify(new_user)
+    return jsonify({"error": "Пользователь не найден"}), 404
 
 @app.route("/update", methods=["POST"])
 def update_user():
