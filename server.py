@@ -3,6 +3,7 @@ from flask_cors import CORS
 import csv
 import os
 from pathlib import Path
+from digital_signature import DigitalSignature
 
 app = Flask(__name__)
 CORS(app)
@@ -10,6 +11,42 @@ CORS(app)
 CSV_FILE = 'users_db.csv'
 DB_FIELDS = ['id', 'phone', 'passport', 'full_name', 'address', 'tariff', 'balance']
 
+ds = DigitalSignature()
+if not ds.load_keys():
+    ds.generate_keys()
+
+@app.route("/sign", methods=["POST"])
+def sign_data():
+    if not request.is_json:
+        return jsonify({"error": "Требуется JSON"}), 400
+    
+    data = request.json.get("data")
+    if not data:
+        return jsonify({"error": "Не указаны данные для подписи"}), 400
+    
+    try:
+        signature = ds.sign_data(data)
+        return jsonify({"signature": signature})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/verify", methods=["POST"])
+def verify_signature():
+    if not request.is_json:
+        return jsonify({"error": "Требуется JSON"}), 400
+    
+    data = request.json.get("data")
+    signature = request.json.get("signature")
+    
+    if not data or not signature:
+        return jsonify({"error": "Не указаны данные или подпись"}), 400
+    
+    try:
+        is_valid = ds.verify_signature(data, signature)
+        return jsonify({"valid": is_valid})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
 def init_db():
     """Создает CSV файл, если его нет"""
     if not Path(CSV_FILE).exists():
